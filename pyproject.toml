@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "py-common"
+version = "0.1.0"
+description = "Shared JWT auth, hybrid audit logging, and idempotency infrastructure for DigSigna's Python microservices."
+requires-python = ">=3.11"
+readme = "README.md"
+
+# Version floors only, deliberately not exact pins: each consuming
+# service (certificate-service, signing-service, ...) resolves its own
+# exact versions in its own requirements/*.txt, and those already diverge
+# between services today (e.g. signing-service needs cryptography>=48 for
+# pyhanko, certificate-service pins <43) — an exact pin here would make
+# this package impossible to install alongside at least one of them.
+dependencies = [
+    "fastapi>=0.104",
+    "requests>=2.32",
+    "cryptography>=42",
+    "PyJWT>=2.8",
+    "redis>=5.0",
+    "SQLAlchemy>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-asyncio>=0.21",
+    "pytest-cov>=4.1",
+    "black>=23.11",
+    "flake8>=6.1",
+    "bandit[toml]>=1.7",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

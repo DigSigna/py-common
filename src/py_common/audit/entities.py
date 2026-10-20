@@ -41,8 +41,12 @@ class AuditData:
 
 @dataclass
 class AuditEvent:
-    user_id: UUID
-    tenant_id: UUID
+    # Both None for an anonymous caller (no IdentityContext) — never a
+    # fabricated UUID: audit_logs.tenant_id is nullable with
+    # ON DELETE SET NULL precisely to allow this, and a made-up tenant_id
+    # just trips its FK constraint on insert.
+    user_id: Optional[UUID]
+    tenant_id: Optional[UUID]
     id: UUID
     correlation_id: Optional[UUID] = None
     session_id: Optional[UUID] = None

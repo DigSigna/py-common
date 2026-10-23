@@ -1,6 +1,10 @@
+from unittest.mock import patch
+
 import pytest
+import requests
 
 from py_common.audit.entities import AuditStrategy
+from py_common.audit.http_transporter import HttpAuditTransporter
 from py_common.audit.hybrid_processor import HybridProcessor
 from py_common.audit.ports import AuditStorage, AuditTransporter
 
@@ -100,4 +104,27 @@ async def test_hybrid_strategy_recovers_after_successful_send():
 
     assert transporter.sent == ["event-2"]
     assert processor._failures == 0
+    assert processor._circuit_open is False
+
+
+@pytest.mark.asyncio
+async def test_hybrid_strategy_resilient_without_api_key_configured():
+    """Regression guard for the AUDIT_API_KEY wiring: a real
+    HttpAuditTransporter with no api_key configured must behave exactly like
+    before this change -- a transport failure falls back to storage without
+    propagating, same as any other transport failure. A missing key must
+    never introduce a new error path or block the circuit breaker/fallback
+    machinery (it only omits a header; see test_http_transporter.py for
+    that).
+    """
+    storage = _FakeStorage()
+    transporter = HttpAuditTransporter("https://audit.internal", "certificate-service")
+    processor = HybridProcessor(AuditStrategy.HYBRID, transporter, storage)
+
+    with patch.object(
+        transporter.session, "post", side_effect=requests.ConnectionError("boom")
+    ):
+        await processor.record_event(None, "event-1")
+
+    assert storage.stored == ["event-1"]
     assert processor._circuit_open is False

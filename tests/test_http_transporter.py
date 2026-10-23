@@ -50,3 +50,56 @@ def test_health_check_raises_runtime_error_on_failure():
     ):
         with pytest.raises(RuntimeError, match="Error en health check"):
             transporter.health_check(None)
+
+
+def test_send_includes_service_api_key_header_when_configured():
+    transporter = HttpAuditTransporter(
+        "https://audit.internal", "certificate-service", api_key="shhh-secret"
+    )
+    fake_response = MagicMock()
+    fake_response.raise_for_status.return_value = None
+
+    with patch.object(
+        transporter.session, "post", return_value=fake_response
+    ) as post_mock:
+        transporter.send(None, event=_FAKE_EVENT)
+
+    _, kwargs = post_mock.call_args
+    assert kwargs["headers"]["X-Service-API-Key"] == "shhh-secret"
+
+
+def test_send_omits_service_api_key_header_when_not_configured():
+    transporter = HttpAuditTransporter("https://audit.internal", "certificate-service")
+    fake_response = MagicMock()
+    fake_response.raise_for_status.return_value = None
+
+    with patch.object(
+        transporter.session, "post", return_value=fake_response
+    ) as post_mock:
+        transporter.send(None, event=_FAKE_EVENT)
+
+    _, kwargs = post_mock.call_args
+    assert "X-Service-API-Key" not in kwargs["headers"]
+
+
+def test_missing_api_key_logs_error_once_at_construction():
+    fake_logger = MagicMock()
+
+    HttpAuditTransporter(
+        "https://audit.internal", "certificate-service", logger=fake_logger
+    )
+
+    assert fake_logger.error.call_count == 1
+
+
+def test_configured_api_key_does_not_log_error():
+    fake_logger = MagicMock()
+
+    HttpAuditTransporter(
+        "https://audit.internal",
+        "certificate-service",
+        api_key="shhh-secret",
+        logger=fake_logger,
+    )
+
+    assert fake_logger.error.call_count == 0

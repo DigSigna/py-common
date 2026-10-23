@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from .entities import AuditEvent, AuditStrategy
 from .hybrid_processor import HybridProcessor
@@ -15,12 +15,16 @@ def new_audit_recorder(
     storage: AuditStorage,
     http_base_url: Optional[str],
     service_name: str,
+    api_key: Optional[str] = None,
+    logger: Optional[Any] = None,
 ) -> AuditRecorder:
     db_storage = storage
 
     http_transporter: Optional[AuditTransporter] = None
     if http_base_url and http_base_url != "mock":
-        http_transporter = HttpAuditTransporter(http_base_url, service_name)
+        http_transporter = HttpAuditTransporter(
+            http_base_url, service_name, api_key=api_key, logger=logger
+        )
 
     if http_transporter is None and strategy in {
         AuditStrategy.HTTP,

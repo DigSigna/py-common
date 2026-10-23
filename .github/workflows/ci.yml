@@ -37,3 +37,87 @@ jobs:
 
       - name: Test
         run: pytest -v --cov=py_common
+
+  release:
+    name: Auto-tag release
+    needs: quality
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version bump and tag
+        id: bump
+        run: |
+          set -euo pipefail
+          last_tag="$(git tag --list 'v*' --sort=-v:refname | head -n1 || true)"
+          if [ -z "$last_tag" ]; then
+            range="HEAD"
+            base_version="0.1.0"
+          else
+            range="${last_tag}..HEAD"
+            base_version="${last_tag#v}"
+          fi
+
+          subjects="$(git log "$range" --pretty=%s)"
+          bodies="$(git log "$range" --pretty=%b)"
+
+          bump=""
+          if echo "$subjects" | grep -qE '^[a-zA-Z]+(\([^)]*\))?!:' || echo "$bodies" | grep -q 'BREAKING CHANGE'; then
+            bump="major"
+          elif echo "$subjects" | grep -qE '^feat(\([^)]*\))?:'; then
+            bump="minor"
+          elif echo "$subjects" | grep -qE '^fix(\([^)]*\))?:'; then
+            bump="patch"
+          fi
+
+          if [ -z "$bump" ]; then
+            echo "No feat/fix/breaking commits since ${last_tag:-the start of history} — skipping release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          IFS='.' read -r major minor patch <<< "$base_version"
+          case "$bump" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+          new_version="${major}.${minor}.${patch}"
+
+          echo "release=true" >> "$GITHUB_OUTPUT"
+          echo "version=${new_version}" >> "$GITHUB_OUTPUT"
+          echo "bump=${bump}" >> "$GITHUB_OUTPUT"
+
+      - name: Bump pyproject.toml, commit, and tag
+        if: steps.bump.outputs.release == 'true'
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.version }}
+          BUMP: ${{ steps.bump.outputs.bump }}
+        run: |
+          set -euo pipefail
+          sed -i -E "s/^version = \".*\"/version = \"${NEW_VERSION}\"/" pyproject.toml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml
+          # [skip ci]: this push must not retrigger this same workflow.
+          git commit -m "chore(release): v${NEW_VERSION} [skip ci]"
+          git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION} (${BUMP})"
+          git push origin HEAD:main
+          git push origin "v${NEW_VERSION}"
+
+      - name: Create GitHub release
+        if: steps.bump.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          gh release create "v${NEW_VERSION}" \
+            --title "v${NEW_VERSION}" \
+            --generate-notes

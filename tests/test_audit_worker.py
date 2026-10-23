@@ -70,6 +70,49 @@ async def test_audit_operation_dispatches_built_event():
 
 
 @pytest.mark.asyncio
+async def test_audit_operation_without_identity_context_leaves_ids_none():
+    """Anonymous callers (no IdentityContext, e.g. verification-service's
+    /verify) must get tenant_id/user_id=None, never a fabricated UUID —
+    a made-up tenant_id trips audit_logs' tenant_id FK on insert since it
+    never matches a real row in `tenants`."""
+    set_context_values(
+        ContextValues(
+            correlation_id="corr-2",
+            session_id="",
+            ip_address="127.0.0.1",
+            user_agent="pytest",
+            request_id="req-2",
+            actor="",
+        )
+    )
+    recorder = _RecordingRecorder()
+    worker = AuditWorker(recorder, config=WorkerConfig(worker_count=1))
+
+    data = AuditData(
+        service_name="verification-service",
+        event_type="BUSINESS",
+        operation="VERIFY_SIGNATURES",
+        resource_id="",
+        resource_type="document",
+        actor_type=ActorType.EXTERNAL.value,
+        success=True,
+        status_code="SUCCESS",
+        err_msg="",
+        duration_ms=33,
+        metadata={},
+    )
+    await worker.audit_operation(None, data, None)
+    await worker._queue.join()
+
+    assert len(recorder.events) == 1
+    event = recorder.events[0]
+    assert event.tenant_id is None
+    assert event.user_id is None
+
+    await worker.close()
+
+
+@pytest.mark.asyncio
 async def test_audit_operation_without_client_is_noop():
     worker = AuditWorker(None)
 

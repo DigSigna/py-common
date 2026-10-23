@@ -26,8 +26,13 @@ class AuditEvent(Base):
     event_action: Mapped[str] = mapped_column(String(255), nullable=False)
 
     organization_id: Mapped[str] = mapped_column(String(36), nullable=True)
-    user_id: Mapped[str] = mapped_column(String(36), nullable=False)
-    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    # Nullable here to match the real schema: tenant_id's FK is
+    # ON DELETE SET NULL (anonymous callers have none) and user_id has no
+    # FK/NOT NULL constraint in the DB at all. Was `nullable=False` with
+    # worker.py fabricating a random UUID to satisfy it — that just moved
+    # the problem to tenant_id's FK instead of fixing it.
+    user_id: Mapped[str] = mapped_column(String(36), nullable=True)
+    tenant_id: Mapped[str] = mapped_column(String(36), nullable=True)
     resource_id: Mapped[str] = mapped_column(String(36), nullable=True)
     resource_type: Mapped[str] = mapped_column(String(255), nullable=True)
 

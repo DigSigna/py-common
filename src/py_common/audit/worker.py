@@ -125,8 +125,8 @@ def _build_event(
         event_type=data.event_type,
         event_action=data.operation,
         organization_id=_coerce_uuid(organization_id),
-        user_id=_require_uuid(user_id),
-        tenant_id=_require_uuid(tenant_id),
+        user_id=_coerce_uuid(user_id),
+        tenant_id=_coerce_uuid(tenant_id),
         resource_id=_coerce_uuid(data.resource_id),
         resource_type=data.resource_type,
         actor_type=_coerce_actor_type(data.actor_type),
@@ -159,8 +159,3 @@ def _coerce_uuid(value: Optional[str]) -> Optional[UUID]:
         return UUID(str(value))
     except ValueError:
         return None
-
-
-def _require_uuid(value: Optional[str]) -> UUID:
-    parsed = _coerce_uuid(value)
-    return parsed or uuid4()

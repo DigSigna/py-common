@@ -8,7 +8,7 @@ from py_common.auth.permissions import require_admin
 from py_common.errors import AuthorizationError
 
 
-def _identity(**permissions) -> IdentityContext:
+def _identity(permissions=None) -> IdentityContext:
     return IdentityContext(
         tenant_id="tenant-1",
         owner_type=OwnerType.TENANT,
@@ -18,7 +18,7 @@ def _identity(**permissions) -> IdentityContext:
         max_cert_level=0,
         can_certify=False,
         certification_path="",
-        permissions=permissions,
+        permissions=permissions or [],
     )
 
 
@@ -29,7 +29,7 @@ def _request_with(identity: IdentityContext) -> MagicMock:
 
 
 def test_require_admin_passes_with_admin_permission():
-    request = _request_with(_identity(admin=True))
+    request = _request_with(_identity(["admin"]))
 
     result = require_admin(request)
 
@@ -37,20 +37,14 @@ def test_require_admin_passes_with_admin_permission():
 
 
 def test_require_admin_rejects_without_permissions():
-    request = _request_with(_identity())
+    request = _request_with(_identity([]))
 
     with pytest.raises(AuthorizationError):
         require_admin(request)
 
 
-def test_require_admin_rejects_with_admin_false():
-    request = _request_with(_identity(admin=False))
+def test_require_admin_rejects_with_other_permissions_only():
+    request = _request_with(_identity(["hsm:key:generate", "certificate:revoke"]))
 
     with pytest.raises(AuthorizationError):
         require_admin(request)
-
-
-def test_require_admin_accepts_string_true():
-    request = _request_with(_identity(admin="true"))
-
-    require_admin(request)

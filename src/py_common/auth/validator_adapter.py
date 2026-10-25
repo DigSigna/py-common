@@ -68,7 +68,7 @@ class JWTValidatorAdapter(JWTValidator):
             max_cert_level=int(claims.get("max_cert_level", 0)),
             can_certify=bool(claims.get("can_certify", False)),
             certification_path=claims.get("certification_path", ""),
-            permissions=claims.get("permissions") or {},
+            permissions=claims.get("permissions") or [],
         )
 
     def _validate_claims(self, claims: Dict[str, Any]) -> None:

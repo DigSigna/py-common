@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, Any, Dict
+from typing import Optional, List
 
 from py_common.errors import (
     InvalidOwnerTypeError,
@@ -19,7 +19,14 @@ class IdentityContext:
     max_cert_level: int
     can_certify: bool
     certification_path: str
-    permissions: Dict[str, Any] = field(default_factory=dict)
+    # Flat list of permission codes (e.g. "admin", "hsm:key:generate") — the
+    # real JWT claim identification-service issues (signer.js/
+    # build-access-token-claims.js) encodes `permissions` as a JSON array,
+    # exactly as go-common's identity.Context.Permissions []string already
+    # documents it. Previously typed Dict[str, Any] with a .get()-based
+    # has_permission(), which crashed with AttributeError against any real
+    # token (KD-015, platform-docs/security/known-deviations.md).
+    permissions: List[str] = field(default_factory=list)
 
     # Campos opcionales (punteros en Go)
     organization_id: Optional[str] = None
@@ -43,19 +50,10 @@ class IdentityContext:
         return self.can_certify and self.max_cert_level >= level
 
     def has_permission(self, name: str) -> bool:
-        """Chequea un flag de permissions boolean-ish (admin, etc.) —
-        tolera bool/str/int igual que hsm-service's AdminAuthMiddleware
-        (toBool). Único punto de verdad: tanto el dependency de ruta
-        (require_admin) como las reglas de autorización dentro de un caso
-        de uso (p. ej. CreateCAUseCase) llaman acá, nunca duplican esta
+        """Chequea membership en la lista plana de codes de permiso —
+        equivalente exacto a go-common's identity.Context.HasPermission
+        (slices.Contains). Único punto de verdad: tanto el dependency de
+        ruta (require_admin) como las reglas de autorización dentro de un
+        caso de uso (p. ej. CreateCAUseCase) llaman acá, nunca duplican esta
         lógica."""
-        if not self.permissions:
-            return False
-        value = self.permissions.get(name)
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, str):
-            return value.lower() in {"true", "1", "yes"}
-        if isinstance(value, (int, float)):
-            return value != 0
-        return False
+        return name in self.permissions

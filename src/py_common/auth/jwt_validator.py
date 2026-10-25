@@ -5,7 +5,7 @@ puerto debe devolver, igual que en la referencia Go."""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import List, Optional
 
 
 @dataclass
@@ -21,7 +21,7 @@ class CustomClaims:
     max_cert_level: int
     can_certify: bool
     certification_path: str
-    permissions: Dict[str, Any]
+    permissions: List[str]
 
 
 class JWTValidator(ABC):

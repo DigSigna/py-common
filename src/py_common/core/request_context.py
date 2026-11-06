@@ -19,7 +19,7 @@ tenant_id_var = contextvars.ContextVar("tenant_id", default=None)
 HEADER_X_FORWARDED_FOR = "X-Forwarded-For"
 HEADER_X_REAL_IP = "X-Real-IP"
 HEADER_USER_AGENT = "User-Agent"
-HEADER_X_REQUEST_ID = "X-Request-ID"
+HEADER_IDEMPOTENCY_KEY = "Idempotency-Key"
 HEADER_X_API_KEY = "X-API-Key"
 HEADER_X_CORRELATION_ID = "X-Correlation-ID"
 HEADER_X_SESSION_ID = "X-Session-ID"

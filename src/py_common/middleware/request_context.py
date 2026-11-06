@@ -10,12 +10,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
 from py_common.core.request_context import (
+    HEADER_IDEMPOTENCY_KEY,
     HEADER_USER_AGENT,
     HEADER_X_API_KEY,
     HEADER_X_CORRELATION_ID,
     HEADER_X_FORWARDED_FOR,
     HEADER_X_REAL_IP,
-    HEADER_X_REQUEST_ID,
     HEADER_X_SESSION_ID,
     ContextValues,
     generate_request_id,
@@ -63,7 +63,9 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         correlation_id = request.headers.get(HEADER_X_CORRELATION_ID) or str(
             uuid.uuid4()
         )
-        request_id = request.headers.get(HEADER_X_REQUEST_ID) or generate_request_id()
+        request_id = (
+            request.headers.get(HEADER_IDEMPOTENCY_KEY) or generate_request_id()
+        )
         session_id = request.headers.get(HEADER_X_SESSION_ID, "")
 
         values = ContextValues(
@@ -77,6 +79,6 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         set_context_values(values)
 
         response = await call_next(request)
-        response.headers.setdefault(HEADER_X_REQUEST_ID, request_id)
+        response.headers.setdefault(HEADER_IDEMPOTENCY_KEY, request_id)
         response.headers.setdefault(HEADER_X_CORRELATION_ID, correlation_id)
         return response
